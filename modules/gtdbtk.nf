@@ -12,7 +12,7 @@ process GTDBTK {
 
     script:
     """
-    GTDB-Tk classify_wf \\
+    gtdbtk classify_wf \\
         --genome_dir ${bins} \\
         --out_dir gtdbtk_results \\
         --cpus ${task.cpus} \\

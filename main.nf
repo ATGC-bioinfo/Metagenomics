@@ -29,7 +29,7 @@ params.metadata      = "$projectDir/data/metadata.csv"
 params.outdir        = "./results"
 
 // ── Assembly ─────────────────────────────────────────────────────────────────
-params.assembly_mem    = "10"
+params.assembly_mem    = "0.9"
 params.min_contig_len  = 200
 params.run_quast       = false
 
@@ -49,7 +49,7 @@ params.run_gtdbtk     = false
 
 // ── Read Taxonomy ────────────────────────────────────────────────────────────
 params.read_length   = 150
-params.kraken_db     = "${projectDir}/../k2_database"
+params.kraken_db     = "/home/habee/Documents/metagenomics/kraken2_standard8_db"
 
 // ── Functional ───────────────────────────────────────────────────────────────
 params.eggnog_db     = "/path/to/eggnog-db"
@@ -61,7 +61,7 @@ params.run_humann    = false
 params.run_diversity = true
 
 // ── Differential Abundance ───────────────────────────────────────────────────
-params.run_diffabund = false
+params.run_diffabund = true
 
 include { FASTQC          } from './modules/fastqc'
 include { FASTP           } from './modules/fastp'
@@ -78,6 +78,8 @@ include { PRODIGAL        } from './modules/prodigal'
 include { EGGNOG          } from './modules/eggnog'
 include { HUMANN          } from './modules/humann'
 include { KRONA           } from './modules/krona'
+include { PLOTS           } from './modules/plots'
+include { COMMUNITY       } from './modules/community'
 include { DIVERSITY       } from './modules/diversity'
 include { DIFFABUND       } from './modules/diffabund'
 include { MULTIQC         } from './modules/multiqc'
@@ -156,17 +158,28 @@ workflow {
         HUMANN(ch_trimmed)
     }
 
-    // ── Stage 10: Visualization ──────────────────────────────────────────
+    // ── Stage 10: Per-sample plots ──────────────────────────────────────
+    ch_bracken_all = KRAKEN2_BRACKEN.out.bracken_p
+        .join(KRAKEN2_BRACKEN.out.bracken_g)
+        .join(KRAKEN2_BRACKEN.out.bracken_s)
+    PLOTS(ch_bracken_all)
+
+    // ── Stage 11: Krona ─────────────────────────────────────────────────
     KRONA(KRAKEN2_BRACKEN.out.kraken_output)
 
-    // ── Stage 11: Diversity Analysis ─────────────────────────────────────
+    // ── Stage 12: Community analysis ─────────────────────────────────────
+    COMMUNITY(
+        KRAKEN2_BRACKEN.out.bracken_s.map { meta, report -> report }.collect()
+    )
+
+    // ── Stage 13: Diversity Analysis ─────────────────────────────────────
     if (params.run_diversity) {
         DIVERSITY(
             KRAKEN2_BRACKEN.out.bracken_s.map { meta, report -> report }.collect()
         )
     }
 
-    // ── Stage 12: Differential Abundance ─────────────────────────────────
+    // ── Stage 14: Differential Abundance ─────────────────────────────────
     if (params.run_diffabund) {
         ch_abundance = KRAKEN2_BRACKEN.out.bracken_s.map { meta, report -> report }.collect()
         DIFFABUND(
@@ -175,7 +188,7 @@ workflow {
         )
     }
 
-    // ── Stage 13: MultiQC report ─────────────────────────────────────────
+    // ── Stage 15: MultiQC report ─────────────────────────────────────────
     MULTIQC(
         FASTQC.out.html.map { meta, html -> html }.collect(),
         FASTQC.out.zip.map { meta, zip -> zip }.collect(),

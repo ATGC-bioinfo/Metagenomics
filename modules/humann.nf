@@ -11,19 +11,31 @@ process HUMANN {
     path("humann.log"),                    emit: log
 
     script:
-    def (r1, r2) = reads
-    """
-    humann \\
-        --input ${r1} \\
-        --input ${r2} \\
-        --output . \\
-        --threads ${task.cpus} \\
-        --metaphlan ${params.kraken_db}/metaphlan \\
-        --bowtie-db ${params.humann_db}/chocophlan \\
-        --protein-db ${params.humann_db}/uniref \\
-        --diamond-db ${params.humann_db}/diamond \\
-        2> humann.log
-    """
+    if (meta.single_end) {
+        """
+        humann \\
+            --input ${reads} \\
+            --output . \\
+            --threads ${task.cpus} \\
+            --metaphlan ${params.humann_db}/metaphlan \\
+            --bowtie-db ${params.humann_db}/chocophlan \\
+            --protein-db ${params.humann_db}/uniref \\
+            2> humann.log
+        """
+    } else {
+        def (r1, r2) = reads
+        """
+        cat ${r1} ${r2} > ${meta.id}.merged.fq
+        humann \\
+            --input ${meta.id}.merged.fq \\
+            --output . \\
+            --threads ${task.cpus} \\
+            --metaphlan ${params.humann_db}/metaphlan \\
+            --bowtie-db ${params.humann_db}/chocophlan \\
+            --protein-db ${params.humann_db}/uniref \\
+            2> humann.log
+        """
+    }
 
     stub:
     """
